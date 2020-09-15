@@ -1,0 +1,9 @@
+{
+    "testing": true,
+    "earliest_date": "2019-09-26",
+    "zoom": {
+        "url": "api.zoom.us",
+        "api_key": "your-api-key",
+        "api_secret": "your-api-secret-key"
+    }
+}
