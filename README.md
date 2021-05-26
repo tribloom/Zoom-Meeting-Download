@@ -1,4 +1,7 @@
 # Zoom-Meeting-Download
+
+Note: You must create a "logs" directory under scripts location or you will get an error.
+
 Download Zoom cloud recordings and transfer them to Google drive
 
 Usage:
