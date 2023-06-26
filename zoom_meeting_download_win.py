@@ -10,7 +10,7 @@
 __author__ = "Michael McCarthy, Tribloom Inc."
 __copyright__ = "Copyright 2020 University of California Berkeley"
 __credits__ = ["Michael McCarthy", "Ian Crew"]
-__license__ = "None"
+__license__ = "MIT License"
 __version__ = "0.01"
 __maintainer__ = "Michael McCarthy"
 __email__ = "mmccarthy@tribloom.com"
@@ -37,9 +37,8 @@ from sys import argv
 from time import time
 import traceback
 import urllib.request
-import requests
-import ssl
-import certifi
+import base64
+
 # Third Party Imports
 import jwt # pip install pyjwt
 
@@ -55,6 +54,10 @@ extensions = {
     "CHAT": "txt",
     "CC": "vtt"
     }
+
+token = None
+token_timeout = 3599
+token_time = None
 
 
 # Create logger with "zoom"
@@ -74,41 +77,6 @@ console_handler.setFormatter(formatter)
 # add the handlers to the logger
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
-
-
-#===============================================================================
-#= JWT
-#===============================================================================
-
-
-"""
-Generate a JWT to send with the request to Zoom.
-"""
-def generate_token():
-    global settings
-    logger.debug("Settings: " + json.dumps(settings, indent=4, sort_keys=True))
-    token = jwt.encode(
-        # Create a payload of the token containing API Key & exp time
-        {"iss": settings["zoom"]["api_key"], "exp": time() + 5000},
-        # Secret used to generate token signature
-        settings["zoom"]["api_secret"],
-        # Specify the hashing alg
-        algorithm='HS256'
-        # Converts token to utf-8
-    ).decode('utf-8')
-
-    return token
-
-
-"""
-Get request headers with a fresh JWT.
-"""
-def get_headers():
-    headers = {
-              'authorization': "Bearer %s" % generate_token(),
-              'content-type': "application/json"
-              }
-    return headers
 
 
 #===============================================================================
@@ -218,6 +186,10 @@ def get_zoom_user(zoom_user_id):
         debug_response(res)
         connection.close()
         raise Exception("API requests too fast looking up user '" + email + "'. Message: "+message)
+    elif res.status == 401:
+        logger.debug('OAuth token expired. Refreshing.')
+        global token
+        token = None
     elif res.status == 404:
         logger.warning("User '" + email + "' was not found in Zoom, status "+str(res.status)+".")
         debug_response(res)
@@ -251,6 +223,8 @@ def get_user_recordings(user_id, from_date="", to_date=""):
     earliest_date = date(dt.year, dt.month, dt.day)
     td = to_date
     fd = td - timedelta(weeks=4)
+    if from_date > fd:
+        fd=from_date
     (m, npt, meeting_ids) =  query_zoom_recordings(user_id, fd, td)
     meetings = meetings + m
     #logger.debug("meetings: "+str(meetings))
@@ -304,6 +278,10 @@ def query_zoom_recordings(user_id, from_date="", to_date="", next_page_token="")
         debug_response(res)
         connection.close()
         return None
+    elif res.status == 401:
+        logger.debug('OAuth token expired. Refreshing.')
+        global token
+        token = None
     else: # res.status == 200
         data = res.read()
         if len(data) == 0:
@@ -392,7 +370,11 @@ def download_recordings(meetings, directory):
                 logger.warning("Skipping meeting file being processed: " + meeting["topic"])
                 continue
             filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
-            urllib.request.urlretrieve(f["download_url"] + "?access_token=" + generate_token(), directory + "\\" + subdir + "\\" + filename)
+            opener = urllib.request.build_opener()
+            opener.addheaders(get_headers())
+            urllib.request.install_opener(opener)
+            urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
+
 
 
 
@@ -486,7 +468,10 @@ def download_single_meeting(meeting,directory):
                     logger.warning("Skipping meeting file being processed: " + meeting["topic"])
                     continue
                 filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
-                urllib.request.urlretrieve(f["download_url"] + "?access_token=" + generate_token(), directory + "\\" + subdir + "\\" + filename)
+                opener = urllib.request.build_opener()
+                opener.addheaders(get_headers())
+                urllib.request.install_opener(opener)
+                urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
         except urllib.error.HTTPError as e:
             logger.error("Got error "+str(e)+" when trying to download single meeting to directory "+directory+" with meeting "+str(meeting["topic"])+" at "+str(meeting["start_time"])+", retrying.")
 #             traceback.print_exc()

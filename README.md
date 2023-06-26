@@ -17,10 +17,4 @@ Options:
   -t to        the date from which to download recordings, format yyyy-mm-dd, if not provided defaults to today's date
   ```
 
-Troubleshooting:
-AttributeError: 'str' object has no attribute 'decode':
-There appears to be an issue with PyJWT that causes this error in newer versions of the library. See https://github.com/jazzband/djangorestframework-simplejwt/issues/346 for details. You can run 'pip freeze' to see the installed version of PyJWT. To downgrade library verions:
-```
-pip uninstall PyJWT
-pip install --upgrade PyJWT==1.7.1
-```
+Note: JWT has been removed and now uses OAuth. If you run into problems with the OAuth token becoming invalid (usually an hour), you may have to rerun the script or remove multiprocessing.
