@@ -80,6 +80,56 @@ logger.addHandler(console_handler)
 
 
 #===============================================================================
+#= Server-to-Server OAuth
+#===============================================================================
+
+
+"""
+Generate an OAuth access token to send with the request to Zoom.
+curl -X POST -H "Authorization: Basic cXpxeGF5TXBTaHE0U2tOQnF5ZVNGZzpxZHVkRjQ5NVM1dGQ4OXlSaWhBUVI2YVI5a0JoZGNQQg==" "https://zoom.us/oauth/token?grant_type=account_credentials&account_id=3UsMLvXPSHaZYOVqDRE-Rw"
+"""
+@retry(wait_exponential_multiplier=5000, wait_exponential_max=50000,stop_max_attempt_number=10) #set to 10 for prod
+def get_token():
+    global token
+    global token_time
+    if token is not None:
+       return token
+    encoded = base64.b64encode(bytes(settings["zoom"]['client_id']+':'+settings['zoom']['client_secret'], 'utf-8'))
+    encoded = str(encoded, 'utf-8')
+    headers = {
+              'authorization': 'Basic'+encoded
+              }
+    connection = http.client.HTTPSConnection(settings["zoom"]["url"])
+    connection.request("POST", "/oauth/token/?grant_type=account_credentials&account_id=%s" % settings['zoom']['account_id'], headers=headers)
+    res = connection.getresponse()
+    token_time = datetime.now()
+    data = res.read()
+    t = json.loads(data.decode("utf-8"))['access_token']
+    token = t
+
+    return token
+
+
+"""
+Get request headers with a  Sever-to-Server access token, refesh as needed.
+"""
+def get_headers():
+    global token_time
+    global token
+    if token_time == None:
+        get_token()
+
+    if (datetime.now() - token_time).total_seconds() > token_timeout:
+        token = None
+    headers = {
+        'authorization': "Bearer %s" % get_token()
+    }
+
+    return headers
+
+
+
+#===============================================================================
 #= Settings File
 #===============================================================================
 
@@ -182,22 +232,22 @@ def get_zoom_user(zoom_user_id):
 
     if res.status == 429:
         message = res.msg
-        logger.warning("API requests too fast looking up user '" + email + "'. Message: "+message)
+        logger.warning("API requests too fast looking up user '" + zoom_user_id + "'. Message: "+message)
         debug_response(res)
         connection.close()
-        raise Exception("API requests too fast looking up user '" + email + "'. Message: "+message)
+        raise Exception("API requests too fast looking up user '" + zoom_user_id + "'. Message: "+message)
     elif res.status == 401:
         logger.debug('OAuth token expired. Refreshing.')
         global token
         token = None
     elif res.status == 404:
-        logger.warning("User '" + email + "' was not found in Zoom, status "+str(res.status)+".")
+        logger.warning("User '" + zoom_user_id + "' was not found in Zoom, status "+str(res.status)+".")
         debug_response(res)
         return None
     else: #elif res.status == 200:
         data = res.read()
         if len(data) == 0:
-            logger.warning("User '" + email + "' no data returned.")
+            logger.warning("User '" + zoom_user_id + "' no data returned.")
             debug_response(res)
         user = json.loads(data.decode("utf-8"))
     # can't return a response after the connection is closed
@@ -371,7 +421,7 @@ def download_recordings(meetings, directory):
                 continue
             filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
             opener = urllib.request.build_opener()
-            opener.addheaders(get_headers())
+            opener.addheaders(tuple(get_headers().items()))
             urllib.request.install_opener(opener)
             urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
 
@@ -469,7 +519,7 @@ def download_single_meeting(meeting,directory):
                     continue
                 filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
                 opener = urllib.request.build_opener()
-                opener.addheaders(get_headers())
+                opener.addheaders(tuple(get_headers().items()))
                 urllib.request.install_opener(opener)
                 urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
         except urllib.error.HTTPError as e:

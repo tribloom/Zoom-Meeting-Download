@@ -229,22 +229,22 @@ def get_zoom_user(zoom_user_id):
 
     if res.status == 429:
         message = res.msg
-        logger.warning("API requests too fast looking up user '" + email + "'. Message: "+message)
+        logger.warning("API requests too fast looking up user '" + zoom_user_id + "'. Message: "+message)
         debug_response(res)
         connection.close()
-        raise Exception("API requests too fast looking up user '" + email + "'. Message: "+message)
+        raise Exception("API requests too fast looking up user '" + zoom_user_id + "'. Message: "+message)
     elif res.status == 401:
         logger.debug('OAuth token expired. Refreshing.')
         global token
         token = None
     elif res.status == 404:
-        logger.warning("User '" + email + "' was not found in Zoom, status "+str(res.status)+".")
+        logger.warning("User '" + zoom_user_id + "' was not found in Zoom, status "+str(res.status)+".")
         debug_response(res)
         return None
     else: #elif res.status == 200:
         data = res.read()
         if len(data) == 0:
-            logger.warning("User '" + email + "' no data returned.")
+            logger.warning("User '" + zoom_user_id + "' no data returned.")
             debug_response(res)
         user = json.loads(data.decode("utf-8"))
     # can't return a response after the connection is closed
@@ -415,7 +415,7 @@ def download_recordings(meetings, directory):
                 continue
             filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
             opener = urllib.request.build_opener()
-            opener.addheaders(get_headers())
+            opener.addheaders(tuple(get_headers().items()))
             urllib.request.install_opener(opener)
             urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
 
@@ -508,7 +508,7 @@ def download_single_meeting(meeting,directory):
                     continue
                 filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
                 opener = urllib.request.build_opener()
-                opener.addheaders(get_headers())
+                opener.addheaders(tuple(get_headers().items()))
                 urllib.request.install_opener(opener)
                 urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
         except urllib.error.HTTPError as e:
