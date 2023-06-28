@@ -221,7 +221,7 @@ Get a Zoom user by Zoom user ID and return it.
 A Zoom login (an email address) is synonymous to a Zoom ID in terms of the API,
 so "zoom_user_id" can be "tribloom@berkeley.edu" or "odkolRk8R8q5qF0KsGLtpA".
 """
-@retry(wait_exponential_multiplier=5000, wait_exponential_max=50000,stop_max_attempt_number=10) 
+@retry(wait_exponential_multiplier=5000, wait_exponential_max=50000,stop_max_attempt_number=1)
 def get_zoom_user(zoom_user_id):
     global settings
     logger.debug("Settings: " + json.dumps(settings, indent=4, sort_keys=True))
@@ -421,7 +421,7 @@ def download_recordings(meetings, directory):
                 continue
             filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
             opener = urllib.request.build_opener()
-            opener.addheaders(tuple(get_headers().items()))
+            opener.addheaders = tuple(items for items in get_headers().items())
             urllib.request.install_opener(opener)
             urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
 
@@ -519,7 +519,7 @@ def download_single_meeting(meeting,directory):
                     continue
                 filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
                 opener = urllib.request.build_opener()
-                opener.addheaders(tuple(get_headers().items()))
+                opener.addheaders = tuple(items for items in get_headers().items())
                 urllib.request.install_opener(opener)
                 urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
         except urllib.error.HTTPError as e:

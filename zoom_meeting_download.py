@@ -415,7 +415,7 @@ def download_recordings(meetings, directory):
                 continue
             filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
             opener = urllib.request.build_opener()
-            opener.addheaders(tuple(get_headers().items()))
+            opener.addheaders = tuple(items for items in get_headers().items())
             urllib.request.install_opener(opener)
             urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
 
@@ -508,7 +508,7 @@ def download_single_meeting(meeting,directory):
                     continue
                 filename = (f["recording_type"] + " " if "recording_type" in f else "") + f["file_type"] + "." + extensions[f["file_type"]]
                 opener = urllib.request.build_opener()
-                opener.addheaders(tuple(get_headers().items()))
+                opener.addheaders = tuple(items for items in get_headers().items())
                 urllib.request.install_opener(opener)
                 urllib.request.urlretrieve(f["download_url"], directory + "/" + subdir + "/" + filename)
         except urllib.error.HTTPError as e:
